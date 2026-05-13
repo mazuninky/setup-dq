@@ -1,0 +1,67 @@
+name: Test
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  install-latest:
+    name: install latest (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, ubuntu-24.04-arm, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Run setup-dq
+        id: setup
+        uses: ./
+        with:
+          version: latest
+
+      - name: Smoke test
+        shell: bash
+        run: |
+          dq --version
+          dq --help > /dev/null
+          test -n "${{ steps.setup.outputs.version }}"
+          test -d "${{ steps.setup.outputs.bin-path }}"
+
+  install-pinned:
+    name: install pinned (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, ubuntu-24.04-arm, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Resolve a known release tag
+        id: tag
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG=$(gh api repos/mazuninky/dq/releases/latest --jq '.tag_name')
+          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Run setup-dq with explicit version
+        id: setup
+        uses: ./
+        with:
+          version: ${{ steps.tag.outputs.version }}
+
+      - name: Verify version matches
+        shell: bash
+        run: |
+          dq --version | grep -F "${{ steps.tag.outputs.version }}"
+          test "${{ steps.setup.outputs.version }}" = "${{ steps.tag.outputs.version }}"
