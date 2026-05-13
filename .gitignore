@@ -1,0 +1,6 @@
+.DS_Store
+*.swp
+*.tmp
+
+# Claude Code local settings (user-specific, never commit)
+.claude/settings.local.json
