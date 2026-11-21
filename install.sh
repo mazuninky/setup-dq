@@ -28,11 +28,11 @@ if [[ "${INPUT_VERSION}" == "latest" ]]; then
         exit 1
     fi
 else
-    # Accept "2026.20.1" or "v2026.20.1"; normalize to v-prefixed tag.
+    # Accept "2026.47.3" or "v2026.47.3"; normalize to v-prefixed tag.
     TAG="v${INPUT_VERSION#v}"
 fi
 VERSION="${TAG#v}"
-if ! printf '%s' "${VERSION}" | grep -Eq '^[0-9]{4}\.(0[1-9]|[1-4][0-9]|5[0-3])\.[1-9][0-9]*$'; then
+if ! printf '%s' "${VERSION}" | grep -Eq '^[0-9]{4}\.([1-9]|[1-4][0-9]|5[0-3])\.[1-9][0-9]*$'; then
     err "Version '${INPUT_VERSION}' (resolved to '${VERSION}') is not in YYYY.WW.BUILD format"
     exit 1
 fi
@@ -52,8 +52,11 @@ case "${RUNNER_OS_INPUT}-${RUNNER_ARCH_INPUT}" in
     macOS-ARM64)
         TARGET="aarch64-apple-darwin"
         ;;
+    macOS-X64)
+        TARGET="x86_64-apple-darwin"
+        ;;
     *)
-        err "Unsupported runner platform: ${RUNNER_OS_INPUT}/${RUNNER_ARCH_INPUT}. dq ships builds for Linux x64, Linux arm64, and macOS arm64."
+        err "Unsupported runner platform: ${RUNNER_OS_INPUT}/${RUNNER_ARCH_INPUT}. dq ships builds for Linux x64 and arm64, and macOS arm64 and x64."
         exit 1
         ;;
 esac
