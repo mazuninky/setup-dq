@@ -19,6 +19,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
 
       - name: Run setup-dq
         id: setup
@@ -28,11 +30,14 @@ jobs:
 
       - name: Smoke test
         shell: bash
+        env:
+          VERSION: ${{ steps.setup.outputs.version }}
+          BIN_PATH: ${{ steps.setup.outputs.bin-path }}
         run: |
           dq --version
           dq --help > /dev/null
-          test -n "${{ steps.setup.outputs.version }}"
-          test -d "${{ steps.setup.outputs.bin-path }}"
+          test -n "$VERSION"
+          test -d "$BIN_PATH"
 
   install-pinned:
     name: install pinned (${{ matrix.os }})
@@ -43,6 +48,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
 
       - name: Resolve a known release tag
         id: tag
@@ -62,15 +69,48 @@ jobs:
 
       - name: Verify version matches
         shell: bash
+        env:
+          WANT: ${{ steps.tag.outputs.version }}
+          GOT: ${{ steps.setup.outputs.version }}
         run: |
-          dq --version | grep -F "${{ steps.tag.outputs.version }}"
-          test "${{ steps.setup.outputs.version }}" = "${{ steps.tag.outputs.version }}"
+          dq --version | grep -F "$WANT"
+          test "$GOT" = "$WANT"
 
+  # actionlint (syntax, expressions, shellcheck on `run:` scripts) and zizmor
+  # (security audits, configured in .github/zizmor.yml). zizmor runs offline:
+  # its online audits follow upstream branches and tags, which would turn a
+  # required check red without a change in this repository.
+  workflows:
+    name: workflows (actionlint + zizmor)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Install zizmor
+        uses: taiki-e/install-action@25f51f6b1bf4e18876107cece836f4f77ac17c8c # v2.90.7
+        with:
+          tool: zizmor@1.32.0
+
+      # go install checks the module against the Go checksum database.
+      - name: Install actionlint
+        shell: bash
+        run: |
+          set -euo pipefail
+          go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+
+      - name: actionlint
+        run: actionlint -color
+
+      - name: zizmor
+        run: zizmor --offline --min-severity low --format github .
   # The one required status check: the branch ruleset requires this job
   # instead of each job above, whose names change with the matrix.
   ci-success:
     name: ci-success
-    needs: [install-latest, install-pinned]
+    needs: [install-latest, install-pinned, workflows]
     runs-on: ubuntu-latest
     if: always()
     steps:
