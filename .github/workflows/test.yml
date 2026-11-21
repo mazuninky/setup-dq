@@ -65,3 +65,16 @@ jobs:
         run: |
           dq --version | grep -F "${{ steps.tag.outputs.version }}"
           test "${{ steps.setup.outputs.version }}" = "${{ steps.tag.outputs.version }}"
+
+  # The one required status check: the branch ruleset requires this job
+  # instead of each job above, whose names change with the matrix.
+  ci-success:
+    name: ci-success
+    needs: [install-latest, install-pinned]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Fail if any dependency failed
+        if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
+        run: exit 1
+      - run: echo "All CI checks passed"
