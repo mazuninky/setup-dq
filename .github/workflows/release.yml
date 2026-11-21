@@ -19,6 +19,8 @@ jobs:
         with:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
+          # Kept: "Move major tag" pushes with these credentials.
+          persist-credentials: true # zizmor: ignore[artipacked]
 
       - name: Validate tag format
         shell: bash
